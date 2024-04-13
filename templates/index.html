@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech to Text to Speech</title>
+    <link rel="stylesheet" href="styles.css"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <h1>Speech to Text to Speech Converter</h1>
+    <div class="container">
+        <div class="input-group">
+            <input type="text" id="text-input">
+            <button id="convert-btn"><i class="fas fa-play"></i></button>
+        </div>
+        <div class="action-btns">
+            <button id="start-record-btn">Start</button>
+            <button id="stop-record-btn" disabled>Stop</button>
+            <button id="play-back-btn" disabled>Play Back</button>
+        </div>
+        <div id="recording-status"></div>
+        <div id="output-text"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
+    <script>
+
+        const textInput = document.getElementById('text-input');
+        const convertBtn = document.getElementById('convert-btn');
+        const startRecordBtn = document.getElementById('start-record-btn');
+        const stopRecordBtn = document.getElementById('stop-record-btn');
+        const recordingStatus = document.getElementById('recording-status');
+        const outputText = document.getElementById('output-text');
+        const playBackBtn = document.getElementById('play-back-btn');
+
+        let transcript = '';
+
+        let recognition = null;
+
+        convertBtn.addEventListener('click', () => {
+            const text = textInput.value.trim();
+            if (text !== '') {
+                convertToSpeech(text);
+            } else {
+                alert('Please enter some text.');
+            }
+        });
+
+        textInput.addEventListener('input', () => {
+            // Enable convert button when text input is not empty
+            convertBtn.disabled = textInput.value.trim() === '';
+        });
+
+        function convertToSpeech(text) {
+            // Send the text to  backend for text-to-speech conversion
+            fetch('/convert', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json', 
+                },
+                body: JSON.stringify({ text: text }),
+            }).then(response => {
+                if (response.ok) {
+                    return response.blob(); // Convert response to Blob
+                }
+                throw new Error('Text-to-speech conversion failed.');
+            }).then(blob => {
+                // Create an object URL for the Blob
+                const objectUrl = URL.createObjectURL(blob);
+
+                // Create an Audio element and set its source to the object URL
+                const audio = new Audio(objectUrl);
+                audio.play(); // Play the audio
+            }).catch(error => {
+                console.error('Error:', error);
+                alert('Error occurred during playback. Please check console for details.');
+            });
+        }
+
+        startRecordBtn.addEventListener('click', () => {
+            startRecording();
+        });
+
+        stopRecordBtn.addEventListener('click', () => {
+            stopRecording();
+        });
+
+        playBackBtn.addEventListener('click', () => {
+            playBack();
+        });
+
+        function startRecording() {
+            recognition = new webkitSpeechRecognition(); 
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US'; 
+
+            recognition.onstart = () => {
+                recordingStatus.innerText = 'Recording...';
+            };
+
+            recognition.onresult = (event) => {
+                transcript = Array.from(event.results)
+                    .map(result => result[0].transcript)
+                    .join('');
+                outputText.innerText = transcript;
+                playBackBtn.disabled = false;
+            };
+
+            recognition.onend = () => {
+                recordingStatus.innerText = 'Stopped recording.';
+            };
+
+            recognition.start();
+            startRecordBtn.disabled = true;
+            stopRecordBtn.disabled = false;
+        }
+
+        function stopRecording() {
+            if (recognition) {
+                recognition.stop();
+                startRecordBtn.disabled = false;
+                stopRecordBtn.disabled = true;
+            }
+        }
+
+        function playBack() {
+            if (transcript.trim() !== '') {
+                // Send the recognized text to backend for text-to-speech conversion
+                fetch('/convert', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json', 
+                    },
+                    body: JSON.stringify({ text: transcript }),
+                }).then(response => {
+                    if (response.ok) {
+                        return response.blob();
+                    }
+                    throw new Error('Text-to-speech conversion failed.');
+                }).then(blob => {
+                    // Create an object URL for the Blob
+                    const objectUrl = URL.createObjectURL(blob);
+    
+                    // Create an Audio element and set its source to the object URL
+                    const audio = new Audio(objectUrl);
+                    audio.play(); // Play the audio
+                }).catch(error => {
+                    console.error('Error:', error);
+                    alert('Error occurred during playback. Please check console for details.');
+                });
+            }
+        }
+    </script>
+</body>
+</html>
